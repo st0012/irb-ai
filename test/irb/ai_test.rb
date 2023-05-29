@@ -4,12 +4,10 @@ require "test_helper"
 
 class IRB::AITest < Test::Unit::TestCase
   test "VERSION" do
-    assert do
-      ::IRB::AI.const_defined?(:VERSION)
-    end
+    assert { ::IRB::AI.const_defined?(:VERSION) }
   end
 
-  test "something useful" do
-    assert_equal("expected", "actual")
-  end
+  # test "something useful" do
+  #   assert_equal("expected", "actual")
+  # end
 end
