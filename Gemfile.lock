@@ -1,0 +1,23 @@
+PATH
+  remote: .
+  specs:
+    irb-ai (0.1.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    power_assert (2.0.3)
+    rake (13.0.6)
+    test-unit (3.5.9)
+      power_assert
+
+PLATFORMS
+  arm64-darwin-22
+
+DEPENDENCIES
+  irb-ai!
+  rake (~> 13.0)
+  test-unit (~> 3.0)
+
+BUNDLED WITH
+   2.4.10
