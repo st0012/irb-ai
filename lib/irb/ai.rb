@@ -19,6 +19,14 @@ module IRB
         @ai_client ||= OpenAI::Client.new(access_token: ENV["OPENAI_API_KEY"])
       end
 
+      def model=(model)
+        @model
+      end
+
+      def model
+        @model ||= "gpt-3.5-turbo"
+      end
+
       def register_irb_commands
         ec = IRB::ExtendCommandBundle.instance_variable_get(:@EXTEND_COMMANDS)
 
@@ -94,12 +102,7 @@ module IRB
         puts "Getting response from OpenAI..."
 
         response =
-          AI.ai_client.chat(
-            parameters: {
-              model: "gpt-3.5-turbo",
-              messages: messages
-            }
-          )
+          AI.ai_client.chat(parameters: { model: AI.model, messages: messages })
 
         if AI.debug_mode?
           puts "==================== Raw Response ===================="
@@ -332,6 +335,7 @@ module IRB
         end
 
         content = response.dig("choices", 0, "message", "content")
+        puts content
 
         parsed = TTY::Markdown.parse(content)
         puts parsed
