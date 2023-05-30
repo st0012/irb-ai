@@ -91,12 +91,6 @@ module IRB
           }
         ]
 
-        if AI.debug_mode?
-          puts "===================== Messages ======================="
-          pp messages
-          puts "======================================================"
-        end
-
         puts "Getting response from OpenAI..."
 
         response =
@@ -135,7 +129,7 @@ module IRB
           )
 
         request = request_section(expression: expression, exception: exception)
-        <<~MSG
+        msg = <<~MSG
           ### Information
 
           #{information}
@@ -144,6 +138,14 @@ module IRB
 
           #{request}
         MSG
+
+        if AI.debug_mode?
+          puts "==================== Message ===================="
+          puts msg
+          puts "================================================="
+        end
+
+        msg
       end
 
       def information_section(
@@ -155,17 +157,10 @@ module IRB
         return_value:
       )
         msg = <<~MSG
-          - The expression `#{expression}` is evaluated in the context of the following code's breakpoint (binding.irb) at line #{context_binding.source_location.last}:
-
-          ```ruby
-          #{code_around_binding(context_binding)}
-          ```
-
-          - The result of the expression is: #{return_value} (ignore if its value equals to `#{IRB::AI::NULL_VALUE}`)
-
+          - The expression `#{expression}` returned `#{return_value}` (ignore if its value equals to `#{IRB::AI::NULL_VALUE}`)
           - Here are the runtime traces when running the expression is evaluated (ignore if blank):
 
-          #{traces}
+          #{traces.join("\n")}
 
           - The execution happened in the context of the object #{context_obj}
             - If a trace has `object-trace` header, that means the trace is about the execution of this object
@@ -176,16 +171,15 @@ module IRB
         if exception
           msg += <<~MSG
             - The execution caused the following exception: #{exception} (ignore if blank)
-              - Exception backtrace is: #{exception&.backtrace}
+              - Exception backtrace is: #{exception.backtrace}
               - If you see multiple `exception-trace`, that means multiple exceptions were raised during the execution
-              - But only the last trace s directly associated with the exception you see above
+              - But only the last trace is directly associated with the exception you see above
               - Use other exception traces to understand the execution flow in general and don't assume they have direct link to the exception above
           MSG
         else
           msg += <<~MSG
-            - The execution did not raise any exception
-              - If you see multiple `exception-trace`, that means multiple exceptions were raised during the execution but they were all rescued
-                However, they are likely expected exceptions and don't necessarily indicate problems inside the program
+            - The execution DID NOT cause an exception
+              - Please ignore all `exception-trace`
           MSG
         end
 
@@ -205,7 +199,9 @@ module IRB
 
           ### Execution Summary
 
-          <summary of the program's actual behaviour from the given trace>
+          <summary of the program's actual behaviour from the given traces>
+          <unless the program failed due to an exception, DO NOT assume the program failed because of the `exception-trace`s>
+
 
           ### Execution Details
 
@@ -220,12 +216,19 @@ module IRB
           </example>
         MSG
 
-        msg += <<~MSG if exception
-          ### Debugging Suggestion for #{exception}
+        msg +=
+          if exception
+            <<~MSG
+              ### Debugging Suggestion for #{exception}
 
-          <potential causes of the error based on the program's execution details as explained in the previous section>
-          <if you think the information is not sufficient, please explicit mention that and explain what information is missing>
-        MSG
+              <potential causes of the error based on the program's execution details as explained in the previous section>
+              <if you think the information is not sufficient, please explicit mention that and explain what information is missing>
+            MSG
+          else
+            <<~MSG
+            <DO NOT assume the program failed due to an exception>
+            MSG
+          end
 
         msg
       end
