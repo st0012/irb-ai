@@ -82,7 +82,7 @@ module IRB
               end
           end
 
-        traces = output.string
+        traces = output.string.split("\n")
 
         response =
           send_messages(
@@ -93,22 +93,23 @@ module IRB
             exception: exception
           )
 
-        if AI.debug_mode?
-          puts "=== Raw Response ==="
-          pp response
-        end
-
-        if error = response.dig("error", "message")
+        while error = response.dig("error", "message")
           if error.match?(/reduce the length/)
-            puts "The generated request is too long. Trying again without runtimne traces..."
-            response =
-              send_messages(
-                expression: expression,
-                context_binding: context_binding,
-                context_obj: context_obj,
-                traces: "",
-                exception: exception
-              )
+            if traces.length >= 1
+              puts "The generated request is too long. Trying again with reduced runtimne traces..."
+              traces = traces.last(traces.length / 2)
+              response =
+                send_messages(
+                  expression: expression,
+                  context_binding: context_binding,
+                  context_obj: context_obj,
+                  traces: traces,
+                  exception: exception
+                )
+            else
+              puts "The generated request is too long even without runtime traces. Please try again with a shorter expression."
+              return
+            end
           else
             puts "OpenAI returned an error: #{error["message"]}"
             return
@@ -119,18 +120,13 @@ module IRB
 
         case finish_reason
         when "stop"
+        when "length"
         else
           puts "OpenAI did not finish processing the request (reason: #{finish_reason}). Please try again."
           return
         end
 
         content = response.dig("choices", 0, "message", "content")
-
-        if AI.debug_mode?
-          puts "==================== Raw content: ===================="
-          puts content
-          puts "======================================================"
-        end
 
         parsed = TTY::Markdown.parse(content)
         puts parsed
@@ -165,18 +161,28 @@ module IRB
         ]
 
         if AI.debug_mode?
-          puts "Sending to OpenAI..."
-          puts "=== Messages ==="
-          puts messages
+          puts "===================== Messages ======================="
+          pp messages
+          puts "======================================================"
         end
 
         puts "Getting response from OpenAI..."
-        AI.ai_client.chat(
-          parameters: {
-            model: "gpt-3.5-turbo",
-            messages: messages
-          }
-        )
+
+        response =
+          AI.ai_client.chat(
+            parameters: {
+              model: "gpt-3.5-turbo",
+              messages: messages
+            }
+          )
+
+        if AI.debug_mode?
+          puts "==================== Raw Response ===================="
+          pp response
+          puts "======================================================"
+        end
+
+        response
       end
 
       def generate_message(
@@ -195,7 +201,7 @@ module IRB
             context_obj: context_obj
           )
 
-        request = request_section(expression: expression)
+        request = request_section(expression: expression, exception: exception)
         <<~MSG
           ### Information
 
@@ -214,11 +220,11 @@ module IRB
         traces:,
         exception:
       )
-        <<~MSG
+        msg = <<~MSG
           - The expression `#{expression}` is evaluated in the context of the following code's breakpoint (binding.irb) at line #{context_binding.source_location.last}:
 
           ```ruby
-          #{File.read(context_binding.source_location.first)}
+          #{code_around_binding}
           ```
 
           - Here are the runtime traces when running the expression is evaluated (ignore if blank):
@@ -228,26 +234,33 @@ module IRB
           - The execution happened in the context of the object #{context_obj}
             - If a trace has `object-trace` header, that means the trace is about the execution of this object
             - If you see no `object-trace`, that means the object is not involved in the execution
-
-          - The execution caused the following exception: #{exception} (ignore if blank)
-            - Exception backtrace is: #{exception&.backtrace}
-            - If you see multiple `exception-trace`, that means multiple exceptions were raised during the execution
-            - But only the last trace s directly associated with the exception you see above
-            - Use other exception traces to understand the execution flow in general and don't assume they have direct link to the exception above
         MSG
+
+        if exception
+          msg += <<~MSG
+            - The execution caused the following exception: #{exception} (ignore if blank)
+              - Exception backtrace is: #{exception&.backtrace}
+              - If you see multiple `exception-trace`, that means multiple exceptions were raised during the execution
+              - But only the last trace s directly associated with the exception you see above
+              - Use other exception traces to understand the execution flow in general and don't assume they have direct link to the exception above
+          MSG
+        else
+          msg += <<~MSG
+            - The execution did not raise any exception
+              - If you see multiple `exception-trace`, that means multiple exceptions were raised during the execution but they were all rescued
+                However, they are likely expected exceptions and don't necessarily indicate problems inside the program
+          MSG
+        end
+
+        msg
       end
 
-      def request_section(expression:)
-        <<~MSG
+      def request_section(expression:, exception:)
+        msg = <<~MSG
           Please respond in the following format, with markdown syntax, and use code highlight when appropriate:
 
           ```
-
-          This is an analysis of the program's behaviour when running the expression `#{expression}` in the context of
-
-          ```rb
-          #{code_around_binding}
-          ```
+          This is an analysis of the program's behaviour when running the expression `#{expression}`
 
           ### Code Summary (skip if no program source code is given)
 
@@ -268,18 +281,25 @@ module IRB
           3. The program called method `bar` at line 3
           4. The trace shows that the program raised an exception at line 4
           </example>
+        MSG
 
-          ### Debugging Suggestion (skip if no error is given)
+        msg += <<~MSG if exception
+          ### Debugging Suggestion for #{exception}
 
           <potential causes of the error based on the program's execution details as explained in the previous section>
           <if you think the information is not sufficient, please explicit mention that and explain what information is missing>
         MSG
+
+        msg
       end
 
       def code_around_binding
         original_colorize = IRB.conf[:USE_COLORIZE]
         IRB.conf[:USE_COLORIZE] = false
-        code = irb_context.workspace.code_around_binding
+        binding = irb_context.workspace.binding
+        file, line = binding.source_location
+
+        File.read(file).lines[(line - 20)..(line + 4)].join
       ensure
         IRB.conf[:USE_COLORIZE] = original_colorize
       end
