@@ -8,6 +8,8 @@ require "tty-markdown"
 
 module IRB
   module AI
+    NULL_VALUE = "NULL RETURN VALUE"
+
     def self.debug_mode?
       ENV["IRB_AI_DEBUG"] && !ENV["IRB_AI_DEBUG"].empty?
     end
@@ -60,6 +62,7 @@ module IRB
         output = StringIO.new
         context_obj = irb_context.workspace.main
         exception = nil
+        return_value = IRB::AI::NULL_VALUE
 
         context_binding = irb_context.workspace.binding
 
@@ -75,7 +78,7 @@ module IRB
               .new(output: output, colorize: false, header: "exception-trace")
               .start do
                 begin
-                  eval(expression, context_binding)
+                  return_value = eval(expression, context_binding)
                 rescue Exception => e
                   exception = e
                 end
@@ -90,7 +93,8 @@ module IRB
             context_binding: context_binding,
             context_obj: context_obj,
             traces: traces,
-            exception: exception
+            exception: exception,
+            return_value: return_value
           )
 
         while error = response.dig("error", "message")
@@ -104,7 +108,8 @@ module IRB
                   context_binding: context_binding,
                   context_obj: context_obj,
                   traces: traces,
-                  exception: exception
+                  exception: exception,
+                  return_value: return_value
                 )
             else
               puts "The generated request is too long even without runtime traces. Please try again with a shorter expression."
@@ -139,7 +144,8 @@ module IRB
         context_binding:,
         context_obj:,
         traces:,
-        exception:
+        exception:,
+        return_value:
       )
         messages = [
           {
@@ -155,7 +161,8 @@ module IRB
                 traces: traces,
                 exception: exception,
                 context_binding: context_binding,
-                context_obj: context_obj
+                context_obj: context_obj,
+                return_value: return_value
               )
           }
         ]
@@ -190,7 +197,8 @@ module IRB
         context_binding:,
         context_obj:,
         traces:,
-        exception:
+        exception:,
+        return_value:
       )
         information =
           information_section(
@@ -198,7 +206,8 @@ module IRB
             traces: traces,
             exception: exception,
             context_binding: context_binding,
-            context_obj: context_obj
+            context_obj: context_obj,
+            return_value: return_value
           )
 
         request = request_section(expression: expression, exception: exception)
@@ -218,7 +227,8 @@ module IRB
         context_binding:,
         context_obj:,
         traces:,
-        exception:
+        exception:,
+        return_value:
       )
         msg = <<~MSG
           - The expression `#{expression}` is evaluated in the context of the following code's breakpoint (binding.irb) at line #{context_binding.source_location.last}:
@@ -226,6 +236,8 @@ module IRB
           ```ruby
           #{code_around_binding}
           ```
+
+          - The result of the expression is: #{return_value} (ignore if its value equals to `#{IRB::AI::NULL_VALUE}`)
 
           - Here are the runtime traces when running the expression is evaluated (ignore if blank):
 
