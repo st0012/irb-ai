@@ -9,7 +9,8 @@ Gem::Specification.new do |spec|
   spec.email = ["stan001212@gmail.com"]
 
   spec.summary = "IRB commands powered by AI."
-  spec.description = "IRB commands powered by AI."
+  spec.description =
+    "IRB-AI is an experimental project that explores various ways to enhance users' IRB experience through AI."
   spec.homepage = "https://github.com/st0012/irb-ai"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 2.6.0"
