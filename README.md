@@ -14,7 +14,7 @@ gem "irb-ai", group: [:development, :test]
 
 ## Setup
 
-Ensure you have your [OpenAI API](https://openai.com/blog/openai-api) stored in `ENV["OPENAI_API_KEY"]`.
+Ensure you have your [OpenAI API](https://openai.com/blog/openai-api) key stored in `ENV["OPENAI_API_KEY"]`.
 
 ## Usage
 
