@@ -58,12 +58,18 @@ new_encryptor = ActiveSupport::MessageEncryptor.new new_secret
 new_encryptor.rotate old_secret
 
 msg_from_old_encryptor = old_encryptor.encrypt_and_sign("test")
-# target: new_encryptor.decrypt_and_verify(msg_from_old_encryptor)
 
-binding.irb
+# Run `explain new_encryptor.decrypt_and_verify(msg_from_old_encryptor) as new_encryptor`
+binding.irb 
 ```
 
-If you run `explain new_encryptor.decrypt_and_verify(msg_from_old_encryptor) as new_encryptor` from the breakpoint, you'll get something similar to this:
+If you run the following command from the breakpoint:
+
+```
+explain new_encryptor.decrypt_and_verify(msg_from_old_encryptor) as new_encryptor
+```
+
+It will respond with answers like this as rendered markdown output:
 
 ```md
 This is an analysis of the program's behaviour when running the expression `new_encryptor.decrypt_and_verify(msg_from_old_encryptor)`
